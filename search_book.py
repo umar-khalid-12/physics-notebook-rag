@@ -16,7 +16,10 @@ class BookSearch:
     def __init__(self):
         manifest_path = DATA / "index_manifest.json"
         if not manifest_path.exists() or not (DATA / "chroma").is_dir():
-            raise ValueError("No saved index found. Run .venv/bin/python embed_book.py first.")
+            raise ValueError(
+                "No saved index found. For local use run: .venv/bin/python embed_book.py. "
+                "On Streamlit Cloud, Data/chroma must be in the GitHub repo."
+            )
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest["model"] != MODEL_NAME or manifest["pipeline"] != PIPELINE_VERSION:
             raise ValueError("The index uses a different embedding setup. Run embed_book.py again.")
@@ -37,8 +40,10 @@ class BookSearch:
         if (self.collection.metadata or {}).get("build_hash") != digest:
             raise ValueError("Collection metadata does not match the saved build.")
         self.model = SentenceTransformer(
-            MODEL_NAME, cache_folder=str(DATA / "model_cache"),
-            device="cpu", local_files_only=True,
+            MODEL_NAME,
+            cache_folder=str(DATA / "model_cache"),
+            device="cpu",
+            local_files_only=False,
         )
 
     def search(self, question, top_k=5):

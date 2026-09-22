@@ -5,5 +5,4 @@ __pycache__/
 .env
 .env.*
 !.env.example
-Data/chroma/
-Data/model_cache/
+Data/model_cache/.locks/
