@@ -1,0 +1,9 @@
+.venv/
+.venv-python39/
+__pycache__/
+.DS_Store
+.env
+.env.*
+!.env.example
+Data/chroma/
+Data/model_cache/

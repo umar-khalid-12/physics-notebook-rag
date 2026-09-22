@@ -1,0 +1,8 @@
+# Step 4: use Python 3.12 with OpenSSL (see README).
+chromadb==1.5.9
+sentence-transformers==5.1.2
+# Step 6: Groq REST API and local configuration.
+httpx==0.28.1
+python-dotenv==1.2.1
+# Step 7: local chat interface.
+streamlit==1.64.0

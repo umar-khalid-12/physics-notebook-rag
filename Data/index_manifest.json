@@ -1,0 +1,8 @@
+{
+  "collection": "physics9-80bc75421b78a09a",
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "pipeline": "token-windows-mean-v1",
+  "build_hash": "80bc75421b78a09aa5647385e342d96bb387f6ca9928b579ef1f45da99478452",
+  "chunks": 245,
+  "dimensions": 384
+}
