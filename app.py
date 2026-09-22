@@ -282,12 +282,31 @@ def get_search_instance(build_hash):
     return BookSearch(), threading.Lock()
 
 
+def _secret(name, default=""):
+    """Read from Streamlit Cloud secrets when available."""
+    try:
+        value = st.secrets.get(name, default)
+    except Exception:
+        return default
+    return default if value is None else value
+
+
 def load_app_settings():
-    """Load environment configurations safely."""
+    """Load config: Streamlit secrets → env vars → local .env."""
     local = dotenv_values(ROOT / ".env")
-    api_key = os.environ.get("GROQ_API_KEY", local.get("GROQ_API_KEY", "")) or ""
-    model = os.environ.get("GROQ_MODEL", local.get("GROQ_MODEL")) or DEFAULT_MODEL
-    return api_key.strip(), model
+    api_key = (
+        _secret("GROQ_API_KEY")
+        or os.environ.get("GROQ_API_KEY", "")
+        or local.get("GROQ_API_KEY", "")
+        or ""
+    )
+    model = (
+        _secret("GROQ_MODEL")
+        or os.environ.get("GROQ_MODEL")
+        or local.get("GROQ_MODEL")
+        or DEFAULT_MODEL
+    )
+    return str(api_key).strip(), str(model).strip() or DEFAULT_MODEL
 
 
 def execute_tutor_answer(question, top_k, api_key, model, build_hash):
@@ -416,7 +435,12 @@ if index_error:
     st.error(index_error)
     st.stop()
 elif not api_key:
-    st.warning("⚠️ **GROQ_API_KEY** is not set in `.env`. Grounded answers require an API key. You can still test vector searches in the Retrieval Inspector.")
+    st.warning(
+        "⚠️ **GROQ_API_KEY** is missing. Locally put it in `.env`. "
+        "On Streamlit Cloud: **App settings → Secrets** and paste "
+        '`GROQ_API_KEY = "your-key"` (plus optional `GROQ_MODEL`). '
+        "You can still test vector search in the Retrieval Inspector."
+    )
 
 # ---------------------------------------------------------------------------
 # Navigation Tabs: Tutor Chat vs. Vector Search Inspector
