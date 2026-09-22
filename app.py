@@ -2,6 +2,7 @@
 Run with: .venv/bin/python -m streamlit run app.py
 """
 import json
+from html import escape
 import os
 import threading
 import time
@@ -12,265 +13,22 @@ from dotenv import dotenv_values
 from answer_book import BookAnswer, DEFAULT_MODEL, build_request
 from embed_book import DATA, ROOT
 from search_book import BookSearch
+import notebook_ui as ui
 
 # ---------------------------------------------------------------------------
 # Page configuration
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Physics Notebook · AI Textbook Assistant",
-    page_icon="⚛️",
+    page_title="Physics Notebook · Stay curious",
+    page_icon="📓",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 # ---------------------------------------------------------------------------
-# Custom CSS Design System
+# Notebook presentation
 # ---------------------------------------------------------------------------
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
-html, body, [class*="css"] {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    color: #142820;
-}
-
-/* Container spacing */
-.block-container {
-    max-width: 1080px;
-    padding-top: 1.8rem;
-    padding-bottom: 3.5rem;
-}
-
-/* App Header styling */
-.hero-container {
-    background: linear-gradient(135deg, #f0f7f3 0%, #ffffff 100%);
-    border: 1px solid #dbe8e1;
-    border-radius: 16px;
-    padding: 1.8rem 2rem;
-    margin-bottom: 1.6rem;
-    box-shadow: 0 4px 20px -8px rgba(36, 107, 88, 0.08);
-}
-.hero-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #e4f0ea;
-    color: #1b5b4a;
-    font-size: 0.76rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 4px 12px;
-    border-radius: 20px;
-    margin-bottom: 0.7rem;
-}
-.hero-title {
-    font-size: 2.2rem;
-    font-weight: 800;
-    color: #10241b;
-    letter-spacing: -0.035em;
-    margin: 0 0 0.4rem 0;
-    line-height: 1.2;
-}
-.hero-desc {
-    color: #536c61;
-    font-size: 1.02rem;
-    margin: 0;
-    line-height: 1.6;
-}
-
-/* Pill badges */
-.status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #ffffff;
-    border: 1px solid #d4e2da;
-    border-radius: 24px;
-    padding: 3px 10px;
-    font-size: 0.76rem;
-    color: #38564a;
-    font-weight: 600;
-    margin-right: 6px;
-    margin-top: 6px;
-}
-.status-dot {
-    width: 7px;
-    height: 7px;
-    background-color: #24a148;
-    border-radius: 50%;
-}
-
-/* Chat Message Cards */
-[data-testid="stChatMessage"] {
-    background-color: #ffffff;
-    border: 1px solid #e1ebe5;
-    border-radius: 14px;
-    padding: 1.2rem 1.4rem;
-    margin-bottom: 1.1rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-    transition: border-color 0.2s ease;
-}
-[data-testid="stChatMessage"]:hover {
-    border-color: #ccdcd3;
-}
-
-/* LLM-style Markdown inside assistant replies */
-[data-testid="stChatMessage"] h3 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #10241b;
-    margin: 1.05rem 0 0.45rem 0;
-    letter-spacing: -0.02em;
-}
-[data-testid="stChatMessage"] h3:first-child {
-    margin-top: 0;
-}
-[data-testid="stChatMessage"] p {
-    line-height: 1.65;
-    margin: 0.35rem 0 0.7rem 0;
-}
-[data-testid="stChatMessage"] ul,
-[data-testid="stChatMessage"] ol {
-    margin: 0.25rem 0 0.85rem 0.2rem;
-    padding-left: 1.2rem;
-}
-[data-testid="stChatMessage"] li {
-    margin: 0.25rem 0;
-    line-height: 1.55;
-}
-[data-testid="stChatMessage"] strong {
-    color: #0f2a20;
-}
-[data-testid="stChatMessage"] table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0.6rem 0 1rem 0;
-    font-size: 0.92rem;
-    overflow: hidden;
-    border: 1px solid #d7e5de;
-    border-radius: 10px;
-}
-[data-testid="stChatMessage"] thead th {
-    background: #eaf3ee;
-    color: #1b4d3e;
-    font-weight: 700;
-    text-align: left;
-}
-[data-testid="stChatMessage"] th,
-[data-testid="stChatMessage"] td {
-    border: 1px solid #d7e5de;
-    padding: 0.55rem 0.75rem;
-    vertical-align: top;
-}
-[data-testid="stChatMessage"] tbody tr:nth-child(even) {
-    background: #f7fbf9;
-}
-[data-testid="stChatMessage"] .katex-display {
-    margin: 0.75rem 0;
-    overflow-x: auto;
-}
-
-/* Citation Box */
-.citation-badge {
-    display: inline-block;
-    background: #eaf3ee;
-    color: #1e5e4d;
-    font-weight: 600;
-    font-size: 0.78rem;
-    padding: 2px 8px;
-    border-radius: 6px;
-    border: 1px solid #cfded6;
-    margin-left: 4px;
-}
-
-/* Passage card for inspector & sources */
-.passage-card {
-    background: #fbfdfc;
-    border: 1px solid #e2ebe6;
-    border-left: 4px solid #246B58;
-    border-radius: 10px;
-    padding: 1.1rem;
-    margin-bottom: 0.9rem;
-}
-.passage-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.6rem;
-    font-size: 0.88rem;
-    color: #1d352b;
-    font-weight: 600;
-}
-.passage-meta {
-    font-size: 0.76rem;
-    color: #557266;
-}
-.passage-text {
-    font-size: 0.86rem;
-    line-height: 1.65;
-    color: #283d34;
-    white-space: pre-wrap;
-    background: #ffffff;
-    border: 1px solid #edf3f0;
-    border-radius: 6px;
-    padding: 0.75rem;
-    font-family: inherit;
-}
-
-/* Sidebar styling */
-[data-testid="stSidebar"] {
-    background-color: #f7faf8;
-    border-right: 1px solid #e1eae5;
-}
-.sidebar-box {
-    background: #ffffff;
-    border: 1px solid #dfe9e3;
-    border-radius: 12px;
-    padding: 1rem;
-    margin: 0.8rem 0;
-}
-
-/* Buttons */
-.stButton button {
-    border-radius: 10px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    transition: all 0.15s ease;
-}
-.stButton button:hover {
-    border-color: #246B58;
-    color: #246B58;
-}
-
-/* Custom tabs */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 8px;
-    border-bottom: 1px solid #e1ece6;
-    margin-bottom: 1.4rem;
-}
-.stTabs [data-baseweb="tab"] {
-    height: 44px;
-    border-radius: 8px 8px 0 0;
-    padding: 0 16px;
-    font-weight: 600;
-    font-size: 0.92rem;
-    color: #4b665a;
-}
-.stTabs [aria-selected="true"] {
-    color: #175443 !important;
-    border-bottom: 2px solid #246B58 !important;
-}
-
-/* Footer / status */
-.latency-tag {
-    font-size: 0.75rem;
-    color: #647e72;
-    margin-top: 0.4rem;
-}
-</style>
-""", unsafe_allow_html=True)
+ui.load_styles()
 
 
 # ---------------------------------------------------------------------------
@@ -348,54 +106,35 @@ if "inspector_results" not in st.session_state:
 # Sidebar: Textbook Info & Testing Controls
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### ⚛️ Physics Notebook")
-    st.caption("AI Study Assistant & RAG Evaluation Studio")
+    ui.brand()
 
-    if st.button("＋  New conversation", use_container_width=True, type="primary"):
+    if st.button("＋  New notebook", use_container_width=True, type="primary"):
         st.session_state.messages = []
         st.session_state.pop("failed_question", None)
         st.session_state.pop("preview_request", None)
         st.rerun()
 
-    # Textbook library card
-    st.markdown("""
-    <div class="sidebar-box">
-        <div style="font-size: 0.72rem; font-weight:700; color:#246B58; letter-spacing:0.08em; text-transform:uppercase;">Textbook Library</div>
-        <div style="font-weight:700; font-size:1.05rem; margin-top:3px;">Physics · Grade 9</div>
-        <div style="font-size:0.83rem; color:#5c766b; margin-top:2px;">Complete 200 PDF pages indexed with all-MiniLM-L6-v2</div>
-    </div>
-    """, unsafe_allow_html=True)
+    ui.library_card()
 
-    st.markdown("##### ⚙️ Test Settings")
-    top_k = st.slider(
-        "Passages to consult (Top-K)",
-        min_value=1,
-        max_value=10,
-        value=5,
-        help="Higher values retrieve more context for Groq to synthesize, but take slightly longer.",
-    )
+    with st.expander("Study preferences"):
+        top_k = st.slider(
+            "Passages per answer", min_value=1, max_value=10, value=5,
+            help="Choose how many textbook passages to consult for each answer.",
+        )
+        model_choice = st.text_input("Groq model", value=default_model)
+        preview_mode = st.checkbox(
+            "Preview request without sending",
+            help="Inspect the question and retrieved passages without calling Groq.",
+        )
 
-    model_choice = st.text_input(
-        "Groq Model",
-        value=default_model,
-        help="Model ID used for grounded generation (e.g. openai/gpt-oss-120b).",
-    )
+    with st.expander("Connection & index"):
+        st.caption(f"Textbook passages: {manifest.get('chunks', 'Unavailable')}")
+        st.caption(f"Embedding model: {manifest.get('model', 'Unavailable')}")
+        st.caption(f"Answer service: {'Connected' if api_key else 'Key needed'}")
+        if manifest.get("build_hash"):
+            st.caption(f"Index build: {manifest['build_hash'][:12]}")
 
-    preview_mode = st.checkbox(
-        "Offline Preview (Dry run)",
-        value=False,
-        help="View the generated prompt & context payload without sending an API request to Groq.",
-    )
-
-    st.divider()
-
-    # Diagnostics
-    with st.expander("🛠️ System Diagnostics"):
-        st.markdown(f"**Index Chunks:** {manifest.get('chunks', 'N/A')}")
-        st.markdown(f"**Embedding Model:** `{manifest.get('model', 'all-MiniLM-L6-v2')}`")
-        st.markdown(f"**Collection:** `{manifest.get('collection', 'N/A')}`")
-        st.markdown(f"**Build Hash:** `{manifest.get('build_hash', 'N/A')[:12]}...`" if manifest.get('build_hash') else "N/A")
-        st.markdown(f"**API Key:** {'Configured ✅' if api_key else 'Missing ⚠️'}")
+    st.html('<div class="sidebar-note"><em>A good place to wonder.</em>Ask freely. Follow the sources.<br>Make the ideas your own.</div>')
 
     if st.session_state.messages:
         transcript = "# Physics Notebook Conversation Transcript\n\n"
@@ -407,7 +146,7 @@ with st.sidebar:
                     transcript += f"- Pages {s['page_start']}–{s['page_end']} ({s.get('section', 'Physics')}): {s['text'][:140]}...\n"
                 transcript += "\n"
         st.download_button(
-            "📥 Download transcript",
+            "↓  Save your notes",
             data=transcript,
             file_name="physics-notebook-transcript.md",
             mime="text/markdown",
@@ -417,19 +156,8 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 # Main Header Banner
 # ---------------------------------------------------------------------------
-st.markdown(f"""
-<div class="hero-container">
-    <div class="hero-tag">Grade 9 Physics · Verified RAG</div>
-    <h1 class="hero-title">Make sense of physics.</h1>
-    <p class="hero-desc">Ask your textbook any question. Every answer is grounded directly in your book's pages with verified citations.</p>
-    <div style="margin-top: 10px;">
-        <span class="status-pill"><span class="status-dot"></span> 200 Pages Indexed</span>
-        <span class="status-pill">📚 {manifest.get('chunks', 0)} Chunks in ChromaDB</span>
-        <span class="status-pill">🤖 {model_choice}</span>
-        <span class="status-pill">🔒 Offline Embedding</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+ui.masthead()
+ui.hero(compact=bool(st.session_state.messages))
 
 if index_error:
     st.error(index_error)
@@ -439,13 +167,13 @@ elif not api_key:
         "⚠️ **GROQ_API_KEY** is missing. Locally put it in `.env`. "
         "On Streamlit Cloud: **App settings → Secrets** and paste "
         '`GROQ_API_KEY = "your-key"` (plus optional `GROQ_MODEL`). '
-        "You can still test vector search in the Retrieval Inspector."
+        "You can still test vector search in Explore the textbook."
     )
 
 # ---------------------------------------------------------------------------
 # Navigation Tabs: Tutor Chat vs. Vector Search Inspector
 # ---------------------------------------------------------------------------
-tab_chat, tab_inspector = st.tabs(["💬 Ask the Book (Grounded Q&A)", "🔍 Retrieval Inspector (Vector Search)"])
+tab_chat, tab_inspector = st.tabs(["Your notebook", "Explore the textbook"])
 
 # ---------------------------------------------------------------------------
 # Tab 1: Grounded Q&A Chat
@@ -455,25 +183,24 @@ with tab_chat:
 
     # Curated Quick Prompts
     if not st.session_state.messages:
-        st.markdown("##### 💡 Try an example question")
-        quick_questions = [
-            "What is the difference between speed and velocity?",
-            "What is centripetal force?",
-            "How are mass and weight different?",
-            "Explain Newton's third law of motion.",
-        ]
-        cols = st.columns(len(quick_questions))
-        for col, qq in zip(cols, quick_questions):
-            if col.button(qq, use_container_width=True, disabled=not ready):
-                active_question = qq
+        ui.section_heading()
+        with st.container(key="topic_grid"):
+            cols = st.columns(4)
+            for col, (number, category, title, subtitle, question, sketch) in zip(cols, ui.TOPICS):
+                with col, st.container(key=f"topic_card_{number}"):
+                    ui.topic_card(number, category, title, subtitle, sketch)
+                    if st.button("Explore this idea  ↗", key=f"prompt_{number}",
+                                 use_container_width=True,
+                                 disabled=not (ready or (preview_mode and not index_error))):
+                        active_question = question
 
     # Render Chat History
     for msg in st.session_state.messages:
-        avatar = "⚛️" if msg["role"] == "assistant" else "👤"
+        avatar = ":material/menu_book:" if msg["role"] == "assistant" else ":material/person:"
         with st.chat_message(msg["role"], avatar=avatar):
             if msg.get("error"):
                 st.error(msg["text"])
-                st.caption("Your question is saved. Use Retry last question below.")
+                st.caption("Your question is saved. Use Try this question again below.")
             elif msg.get("is_preview"):
                 st.info("ℹ️ **Offline Preview Mode (API was not called)**")
                 st.json(msg["payload"])
@@ -489,7 +216,7 @@ with tab_chat:
 
             sources = msg.get("sources", [])
             if sources:
-                with st.expander(f"📖 View Cited Book Sources ({len(sources)} passages)"):
+                with st.expander(f"Read the sources · {len(sources)} passages"):
                     st.caption("Exact excerpts retrieved from the PDF. Page numbers count from the first PDF page.")
                     for idx, s in enumerate(sources, 1):
                         p_start, p_end = s["page_start"], s["page_end"]
@@ -499,16 +226,16 @@ with tab_chat:
                         st.markdown(f"""
                         <div class="passage-card">
                             <div class="passage-header">
-                                <span>#{idx} · {page_label} · {section}</span>
-                                <span class="passage-meta">Chunk ID: {s.get('id', 'N/A')}</span>
+                                <span>#{idx} · {page_label} · {escape(str(section))}</span>
+                                <span class="passage-meta">Chunk ID: {escape(str(s.get('id', 'N/A')))}</span>
                             </div>
-                            <div class="passage-text">{s['text']}</div>
+                            <div class="passage-text">{escape(s['text'])}</div>
                         </div>
                         """, unsafe_allow_html=True)
 
     # Retry Button for failed attempts
     if st.session_state.get("failed_question"):
-        if st.button("🔄 Retry last question", disabled=not ready):
+        if st.button("Try this question again", disabled=not (ready or preview_mode)):
             active_question = st.session_state.failed_question
             if st.session_state.messages and st.session_state.messages[-1].get("error"):
                 st.session_state.messages.pop()
@@ -516,10 +243,11 @@ with tab_chat:
 
     # Chat input
     user_input = st.chat_input(
-        "Ask a question about 9th-grade physics…",
+        "What are you curious about?",
         disabled=not ready and not preview_mode,
         max_chars=2000,
     )
+    st.html('<p class="input-hint">A question, a tricky concept, a “why does that happen?”</p>')
     final_query = user_input or active_question
 
     if final_query and final_query.strip():
@@ -582,8 +310,8 @@ with tab_chat:
 # Tab 2: Retrieval Inspector (Offline Vector Similarity Search)
 # ---------------------------------------------------------------------------
 with tab_inspector:
-    st.markdown("#### 🔍 Real-Time Vector Retrieval Inspector")
-    st.caption("Test ChromaDB embeddings and similarity ranking directly without calling Groq or spending API tokens.")
+    st.markdown("#### A closer look at the textbook")
+    st.caption("Find the original passages behind an idea. Search your book without generating an answer.")
 
     col_q, col_k = st.columns([4, 1])
     with col_q:
@@ -593,9 +321,9 @@ with tab_inspector:
             label_visibility="collapsed",
         )
     with col_k:
-        inspect_k = st.number_input("Results (k)", min_value=1, max_value=15, value=5)
+        inspect_k = st.number_input("Passages", min_value=1, max_value=15, value=5)
 
-    if st.button("🔎 Run Retrieval Search", type="secondary"):
+    if st.button("Find passages  →", type="secondary"):
         if inspect_query.strip():
             start_search = time.monotonic()
             results = execute_search_only(inspect_query.strip(), inspect_k, manifest["build_hash"])
@@ -624,15 +352,17 @@ with tab_inspector:
                 st.markdown(f"""
                 <div class="passage-card">
                     <div class="passage-header">
-                        <span><b>#{i}</b> · {page_text} · <i>{item.get('section') or 'Textbook section'}</i></span>
+                        <span><b>#{i}</b> · {page_text} · <i>{escape(str(item.get('section') or 'Textbook section'))}</i></span>
                         <span class="passage-meta">Distance: <b>{distance:.4f}</b> · Sim: <b>{similarity*100:.1f}%</b></span>
                     </div>
                     <div style="background-color: #e6eeea; height: 5px; border-radius: 3px; margin-bottom: 8px;">
                         <div style="background-color: #246B58; width: {similarity*100}%; height: 100%; border-radius: 3px;"></div>
                     </div>
-                    <div class="passage-text">{item['text']}</div>
+                    <div class="passage-text">{escape(item['text'])}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-        with st.expander("📄 View Raw Results (JSON)"):
+        with st.expander("View retrieval details"):
             st.json(data["results"])
+
+ui.footer(manifest.get("chunks", 0))
