@@ -42,6 +42,11 @@ class NotebookUITests(unittest.TestCase):
         self.assertEqual(app.session_state.messages[0]['text'], 'What is the difference between speed and velocity?')
         self.assertEqual(app.session_state.messages[-1]['text'], 'A cited answer.')
         ask.assert_called_once()
+        app.button(key='explain_calculations').click().run(timeout=30)
+        self.assertEqual(len(app.exception), 0)
+        self.assertEqual(ask.call_count, 2)
+        self.assertIn('every calculation step', ask.call_args.args[0])
+        self.assertEqual(ask.call_args.kwargs['history'][0]['text'], 'What is the difference between speed and velocity?')
 
 
 if __name__ == '__main__':

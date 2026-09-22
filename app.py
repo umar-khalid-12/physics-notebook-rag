@@ -10,7 +10,8 @@ import time
 import streamlit as st
 from dotenv import dotenv_values
 
-from answer_book import BookAnswer, DEFAULT_MODEL, build_request
+from answer_book import BookAnswer, DEFAULT_MODEL, build_request, retrieval_query
+from answer_markdown import normalize_math_markdown
 from embed_book import DATA, ROOT
 from search_book import BookSearch
 import notebook_ui as ui
@@ -67,12 +68,12 @@ def load_app_settings():
     return str(api_key).strip(), str(model).strip() or DEFAULT_MODEL
 
 
-def execute_tutor_answer(question, top_k, api_key, model, build_hash):
+def execute_tutor_answer(question, top_k, api_key, model, build_hash, history=None):
     """Execute grounded RAG query through BookAnswer with thread safety."""
     search, lock = get_search_instance(build_hash)
     with lock:
         answerer = BookAnswer(api_key=api_key, model=model, search=search)
-        return answerer.ask(question, top_k=top_k)
+        return answerer.ask(question, top_k=top_k, history=history)
 
 
 def execute_search_only(query, top_k, build_hash):
@@ -205,7 +206,7 @@ with tab_chat:
                 st.info("ℹ️ **Offline Preview Mode (API was not called)**")
                 st.json(msg["payload"])
             else:
-                st.markdown(msg["text"])
+                st.markdown(normalize_math_markdown(msg["text"]) if msg["role"] == "assistant" else msg["text"])
 
             if msg.get("elapsed") is not None:
                 st.markdown(
@@ -232,6 +233,12 @@ with tab_chat:
                             <div class="passage-text">{escape(s['text'])}</div>
                         </div>
                         """, unsafe_allow_html=True)
+
+    if st.session_state.messages:
+        latest = st.session_state.messages[-1]
+        if latest["role"] == "assistant" and not latest.get("error") and not latest.get("is_preview"):
+            if st.button("Show every calculation step", key="explain_calculations", disabled=not ready):
+                active_question = "Explain the previous problem in detail, showing every calculation step."
 
     # Retry Button for failed attempts
     if st.session_state.get("failed_question"):
@@ -262,14 +269,15 @@ with tab_chat:
     # Process pending user message if last message is from user
     if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
         current_q = st.session_state.messages[-1]["text"]
+        history = st.session_state.messages[:-1]
         start_time = time.monotonic()
 
         if preview_mode:
             with st.spinner("Generating prompt preview without API call…"):
                 search, lock = get_search_instance(manifest["build_hash"])
                 with lock:
-                    passages = search.search(current_q, top_k=top_k)
-                req_payload = build_request(current_q, passages, model=model_choice)
+                    passages = search.search(retrieval_query(current_q, history), top_k=top_k)
+                req_payload = build_request(current_q, passages, model=model_choice, history=history)
                 st.session_state.messages.append({
                     "role": "assistant",
                     "text": "Here is the JSON request that would be sent to Groq:",
@@ -288,6 +296,7 @@ with tab_chat:
                         api_key=api_key,
                         model=model_choice,
                         build_hash=manifest["build_hash"],
+                        history=history,
                     )
                 st.session_state.messages.append({
                     "role": "assistant",
